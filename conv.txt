@@ -1,0 +1,83 @@
+i want to create a app which will take any hf model and create an interactive model viewer 
+
+https://hfviewer.com/nvidia/GLM-5.2-NVFP4 
+
+exactly like this
+
+Resolved to draft implementation plan without markdown
+Resolved to draft implementation plan without markdown
+
+I fetched the page to see what it actually does. Here's the plan, phase by phase with Claude Code prompts and gates.
+
+The whole thing hinges on one thing: you never download weights. config.json + model.safetensors.index.json give you every parameter name and shape for a few KB, and for anything transformers supports you can instantiate the real nn.Module tree on the meta device — a trillion-parameter MoE costs zero bytes. That's how they render GLM-5.2 without a GPU farm. Everything else is plumbing.
+
+Two things worth flagging before you start:
+
+The security bit is not optional. trust_remote_code=True runs arbitrary Python from a stranger's repo. On a public site that's your entire attack surface, and it's the one part of this that can go badly wrong rather than just badly. It's a gate in phase 1 for that reason.
+
+Think about what this is for. hfviewer is Embedl's lead-gen for their quantization product — it's free because it isn't the product. A straight clone inherits the costs (extraction compute, HF bandwidth, sandboxing ops) without the thing that pays for them. Given you're building toward income rather than portfolio, either it's the wedge that pulls people into cvnode's model-explorer half, or it needs its own answer. The plan works for either, but the answer changes what you build in phase 4.
+
+Phase 0 is a weekend and kills or confirms the whole idea — if meta-device instantiation fails on more than 3 of the 10 test models, you find out before writing any frontend.
+
+Hf viewer plan
+Document · MD 
+
+the aim is to take a hf model like glm5.2 from say a private or public repo. i want to visualize the model to understand but also later i will attach vllm, sglang, or atom infrastructures which will call the model and also i can attach traces produced by running the model with specific configurations and it should produce a visualization. the aim is to optimize say for example a specific model for specific infrastrcutre like vllm and port items and get ideas. show regression between 2 runs when i attach 2 traces, etc. this tool will be useful for a performance engineer
+
+Reframed static viewer into performance engineering platform with attribution challenges
+Reframed static viewer into performance engineering platform with attribution challenges
+
+That reframes the project substantially — and improves it. The architecture graph stops being the product and becomes the substrate: a stable coordinate system that runtime measurements get pinned to. Let me update the plan around that.
+
+Edited a memory, created a file, read a file
+Edited a memory, created a file, read a file
+
+Three things changed materially:
+
+The risk moved. In v1 the open question was "can I extract the graph" — that's basically solved. Now the make-or-break is kernel→node attribution, and it's genuinely hard: vLLM and SGLang don't run the eager nn.Module graph on the hot path. CUDA graph replays, FlashInfer/paged attention, fused MoE — by the time you're looking at sm90_xmma_gemm_bf16bf16..., the module boundaries are gone. So phase 0b is now a standalone spike that runs before you build anything: measure what fraction of GPU time you can actually pin to a node, across {torch profiler, NVTX} × {cudagraph, eager}. Below ~70% and the honest product is a trace differ with coarse architectural grouping, not a per-node overlay.
+
+The analytical model is the real differentiator. Your static graph already has every shape, so you get theoretical FLOPs, bytes moved, and arithmetic intensity per node for free, with no execution. The gap between that and the measured time is exactly what a perf engineer is hunting. It also means phase 1 ships something useful before a single trace exists — "what does this model cost on this GPU at batch 32" is already a question people pay to answer. And it surfaces things straight from config.json: attention-decode arithmetic intensity is ≈ 2·H/H_kv, so the GQA ratio is directly readable as a bandwidth number.
+
+Prefill and decode can never be aggregated. Compute-bound batched GEMM vs memory-bound KV streaming. Any node showing one blended number is lying, and a perf engineer will notice in five minutes and close the tab. Same reason the IR stores distributions rather than point values, and always reports unattributed_pct — a regression claim built on one step with 40% unattributed time is worse than no tool.
+
+The cross-stack comparison is the piece most likely to get you noticed by the vLLM/SGLang communities, which is worth more than any marketing you'd otherwise do for this.
+
+One question that changes the design: do you control the deployment being profiled, or does the tool have to eat traces someone hands you? If you control it, NVTX instrumentation is available and phase 0b should spike that. If not, structural inference (Tier 3) becomes load-bearing and it's a much harder spike — worth knowing which before you start. (Also, tell me what "atom" is — I've assumed a serving/quantization runtime, but it needs its own trace parser either way.)
+
+Hf perf viewer plan
+Document · MD 
+
+I can't do that — I don't have access to your GitHub account, and creating a repo would mean authenticating as you, which I won't do even with credentials in hand. That one you'll need to run yourself.
+
+What I can do is have everything packaged and ready to push. Let me assemble it.
+
+Identified shell compatibility issue and devised workaround
+Identified shell compatibility issue and devised workaround
+
+Repo is assembled, committed, and ready — 260 KB, 11 files, one commit already made. Download the tarball or the folder, then:
+
+bash
+cd perfviewer
+gh repo create perfviewer --public --source=. --remote=origin --push
+
+That's it — git history already exists, so nothing to redo.
+
+What's in it:
+
+README.md — the thesis, the four data planes, repo map, the findings we derived (ridge points, the ~164-of-256 expert calculation, MLA vs GQA KV share, the NVFP4/MXFP4 mismatch), the attribution risk with its 70% gate, and sequencing
+docs/ — both build plans, v1 static-viewer and v2 perf-tool
+prototypes/ — all four versions, renamed to describe what each adds
+research/prior-art.md — new, written for the repo: hfviewer, Model Explorer (full feature list + where it stops), Talaria with its evaluation and findings, the interactive explainers, ROCm tooling equivalents, MI355X specs
+PUSH.md, LICENSE (MIT), .gitignore that excludes traces and weights
+
+I kept the prototype progression as a feature rather than flattening it to the final version — the README explains what each one got wrong. That's more useful to a reader than four near-identical files.
+
+Three things to settle before you flip it public. They're in PUSH.md but they matter more than the git commands:
+
+atom. Nothing in here names it or describes it — deliberate. If you later add trace formats, kernel names, or comparative numbers from an internal AMD framework, that's a private repo, and probably a conversation with its owners first. Git history doesn't forget; removing something is a rewrite plus a force push plus hoping nobody cloned.
+
+The MI355X numbers are all from AMD's public product page. Numbers from your own runs are a different category.
+
+Your employment agreement. You've described this as side work while employed full-time. Worth knowing where that lands on side projects before a public repo with your name on it exists — much easier to check now than to unwind later.
+
+One thing I'd change before publicising anywhere: the prototypes contain synthetic measurements. The README says so, but a banner comment at the top of each .jsx would make that survive someone skimming.
