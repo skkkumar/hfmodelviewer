@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GLM-5.2 code-level graph</title>
+  <style>
+    :root {
+      --bg: #181818;
+      --elev: #222222;
+      --text: #e6e6e6;
+      --muted: #9a9a9a;
+      --faint: #6e6e6e;
+      --stroke: #3a3a3a;
+      --accent: #4c8bf5;
+      --red: #fc6b83;
+      --orange: #dd7f76;
+      --yellow: #f1b467;
+      --blue: #7bafe9;
+      --gray: #9a9a9a;
+      --cyan: #81a1c1;
+      --purple: #9386f2;
+      --fill: #2c2c2c;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
+    a { color: var(--accent); }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; }
+    h1 { font-size: 24px; font-weight: 600; margin: 0 0 12px; }
+    h2 { font-size: 18px; font-weight: 600; margin: 32px 0 10px; }
+    h3 { font-size: 14px; font-weight: 600; margin: 18px 0 8px; }
+    p { margin: 0 0 12px; }
+    .muted { color: var(--muted); }
+    .faint { color: var(--faint); font-size: 12px; }
+    .briefing { border: 1px solid var(--stroke); background: var(--elev); padding: 20px 22px; border-radius: 8px; margin-bottom: 28px; }
+    .briefing p:last-child { margin-bottom: 0; }
+    .callout { border: 1px solid var(--stroke); padding: 12px 14px; border-radius: 8px; margin: 16px 0; background: var(--elev); }
+    .callout.warn { border-color: #7a5a2a; }
+    .callout.info { border-color: #3a557a; }
+    .callout b { display: block; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0 18px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--stroke); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    tr:nth-child(even) td { background: #1d1d1d; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; background: #2a2a2a; padding: 1px 5px; border-radius: 4px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+    .stat { background: var(--elev); border: 1px solid var(--stroke); border-radius: 8px; padding: 12px; }
+    .stat .v { font-size: 20px; font-weight: 600; }
+    .stat .l { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    select { background: var(--elev); color: var(--text); border: 1px solid var(--stroke); border-radius: 6px; padding: 6px 8px; min-width: 180px; }
+    .pill { border: 1px solid var(--stroke); background: transparent; color: var(--text); border-radius: 999px; padding: 4px 10px; cursor: pointer; font: inherit; }
+    .pill.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 12px 0 16px; font-size: 12px; color: var(--muted); }
+    .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr); gap: 16px; }
+    .graph { position: relative; overflow: auto; background: #141414; border: 1px solid var(--stroke); border-radius: 8px; min-height: 280px; }
+    .node { position: absolute; width: 168px; height: 44px; border-radius: 6px; border: 1px solid var(--stroke); padding: 6px 8px; text-align: left; cursor: pointer; font: inherit; color: var(--text); }
+    .node.sel { border-color: var(--accent); }
+    .node .t { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .node .k { font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card { background: var(--elev); border: 1px solid var(--stroke); border-radius: 8px; }
+    .card h3 { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--stroke); font-size: 12px; font-weight: 600; }
+    .card .body { padding: 14px; }
+    .bar-row { display: grid; grid-template-columns: 180px 1fr 56px; gap: 8px; align-items: center; margin: 6px 0; font-size: 12px; }
+    .bar { height: 10px; background: var(--fill); border-radius: 4px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: var(--blue); }
+    .share { display: flex; height: 10px; border-radius: 4px; overflow: hidden; background: var(--fill); margin: 8px 0 20px; }
+    .share span { display: block; height: 100%; }
+    details { margin: 4px 0 4px 8px; }
+    summary { cursor: pointer; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 900px) {
+      .layout, .stats, .grid3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="briefing" id="briefing">
+      <h1>Code-level model view, not HF Viewer</h1>
+      <p>HF Viewer is not very detailed — it is only a high-level outline. The view you want is code-level: <b>module → function → backend → kernel</b>, with latency and bound heatmaps on the graph itself.</p>
+      <p>HF Viewer is a <b>config outline</b>. It names blocks (MLA, MoE, RMSNorm) from <code>config.json</code> and modeling code. It never runs the model, never walks vLLM/SGLang, and never names a kernel. The view you want is a <b>code-level execution graph</b>: the same GLM-5.2 layer as the functions that ran, the backend that dispatched them, the kernel that launched, the other kernels that could have, and latency / memory-vs-compute painted on those nodes — not on a Perfetto timeline.</p>
+      <p>Use the depth control below to go from hfviewer-like architecture down to CUDA/Triton launches, then click a node.</p>
+      <h2>What “code-level” means here</h2>
+      <table>
+        <thead><tr><th>Zoom</th><th>Example</th><th>In HF Viewer?</th></tr></thead>
+        <tbody>
+          <tr><td>Architecture</td><td>embed → decoder×78 → MTP → lm_head</td><td>Yes</td></tr>
+          <tr><td>Modules</td><td><code>input_layernorm</code>, <code>self_attn</code>, <code>mlp</code></td><td>Named blocks only</td></tr>
+          <tr><td>Functions</td><td><code>q_a_proj</code>, <code>kv_a_proj_with_mqa</code>, <code>DSABackend.forward</code>, <code>fused_topk</code></td><td>No</td></tr>
+          <tr><td>Kernels</td><td><code>tilelang_dsa_indexer_topk</code>, <code>flashinfer::mla_sparse_decode</code>, DeepGEMM grouped w1/w2</td><td>No</td></tr>
+          <tr><td>Counters</td><td>FLOP/byte, HBM%, SM% → memory vs compute</td><td>No</td></tr>
+          <tr><td>Alternatives</td><td>FLASHINFER_MLA_SPARSE vs tilelang vs TRITON_MLA vs AITER</td><td>No — registries, not traces</td></tr>
+        </tbody>
+      </table>
+      <p>A typical SGLang decode path for one layer is not “an attention block.” It is:</p>
+      <p><code>Scheduler.run_batch</code> → <code>ModelRunner.forward_decode</code> → <code>GlmMoeDsaDecoderLayer.forward</code> → <code>GlmMoeDsaAttention.forward</code> → <code>DSABackend.forward</code> → <code>tilelang_dsa_indexer_topk</code> + <code>sparse_mla_decode</code> → then the MoE path <code>gate</code> → <code>moe_align_block_size</code> → grouped GEMM w1/w2 for 8 of 256 experts.</p>
+      <p>HF Viewer stops at the second name in that list.</p>
+      <h2>Why Perfetto is the wrong home screen</h2>
+      <p>Perfetto is a timeline of events. You want a <b>graph of ops</b>. They only line up if every kernel carries a stable <code>op_id</code> (<code>layers.17.self_attn.sparse_mla</code>) that also exists on the module tree. nsys gives duration and kernel names; Nsight Compute gives the heatmap (arithmetic intensity, HBM%, SM%). Alternative backends never appear in a trace — they come from vLLM’s AttentionBackend / Fp8MoeBackend registries and SGLang flags like <code>--dsa-decode-backend tilelang</code>.</p>
+      <p>Fusions make a naive stack dump lie: <code>residual + x</code> and RMSNorm often become one <code>fused_add_rmsnorm</code>; <code>silu_and_mul</code> often dies as a GEMM epilogue; CUDA graphs collapse hundreds of launches into <code>cudaGraphLaunch</code>. The code-level view has to keep the Python functions <b>and</b> show they fused.</p>
+      <p>There is no website that already does this for GLM-5.2. The practical path is: serve with SGLang/vLLM → NVTX/<code>record_function</code> around every <code>forward</code> → nsys + ncu → dump engine registries → join on <code>op_id</code> → color the module tree. This page is that target UI, with walkthrough timings so you can see the shape before you wire a live profile.</p>
+      <p class="faint">Numbers are an illustrative decode step for one GLM-5.2 layer (batch 8, ~8k cached context, H200-class, FP8, SGLang DSA tilelang). Architecture, file names, backend registries, and kernel families are real; timings are typical-order walkthrough data, not a live nsys capture.</p>
+    </section>
+
+    <div class="stats" id="stats"></div>
+    <div class="callout warn"><b>HF Viewer stops one layer too high</b>Replacing huggingface.co with hfviewer.com gives you module names and tensor ranks. It does not execute the model, does not record vLLM or SGLang, and has no kernel. The missing product is a join: architecture IR × serving-engine IR × profiler IR, with the architecture graph as the canvas and Perfetto as a drill-through, not the home screen.</div>
+
+    <h2>One GLM-5.2 decoder layer — click a node</h2>
+    <p>Switch depth from architecture (hfviewer-like) to kernels (every launch in this layer). Heatmaps color the same graph: red/orange = hot, yellow = memory-bound or low AI, blue = compute-bound or high AI.</p>
+    <div class="row">
+      <div><label>Depth</label>
+        <select id="depth">
+          <option value="architecture">Architecture (hfviewer)</option>
+          <option value="modules">Modules (nn.Module)</option>
+          <option value="functions">Functions (Python/C++)</option>
+          <option value="kernels" selected>Kernels (CUDA/Triton)</option>
+        </select>
+      </div>
+      <div><label>Heatmap on the graph</label>
+        <select id="heat">
+          <option value="none">Structure only</option>
+          <option value="latency" selected>GPU time</option>
+          <option value="bound">Memory vs compute</option>
+          <option value="ai">Arithmetic intensity</option>
+        </select>
+      </div>
+      <div><label>Serving engine</label>
+        <select id="engine">
+          <option value="sglang">SGLang</option>
+          <option value="vllm">vLLM</option>
+        </select>
+      </div>
+      <button class="pill on" data-heat="latency" type="button">Latency</button>
+      <button class="pill" data-heat="bound" type="button">Bound</button>
+      <button class="pill" data-heat="ai" type="button">AI</button>
+    </div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--red)"></i>Hot (high µs)</span>
+      <span><i class="sw" style="background:var(--yellow)"></i>Memory-bound / low AI</span>
+      <span><i class="sw" style="background:var(--orange)"></i>Mixed / ridge</span>
+      <span><i class="sw" style="background:var(--blue)"></i>Compute-bound / high AI</span>
+      <span><i class="sw" style="background:var(--gray)"></i>Launch-bound</span>
+    </div>
+    <div class="layout">
+      <div class="graph" id="graph"></div>
+      <div class="card"><h3>Selected node <span id="engLabel" class="faint" style="float:right">sglang</span></h3><div class="body" id="inspector"></div></div>
+    </div>
+
+    <h2>GPU time in this layer (illustrative decode step)</h2>
+    <div id="bars"></div>
+    <p class="faint">Source: walkthrough decode step for one of 78 layers · H200-class · FP8 · batch 8 · ~8k KV. MoE grouped GEMMs dominate compute; sparse MLA and the DSA indexer stay memory-bound even when GEMMs are on the compute roof.</p>
+    <div class="row" style="justify-content:space-between"><span class="faint">Layer GPU time share</span><span class="faint">612 µs / layer (illustrative)</span></div>
+    <div class="share">
+      <span style="width:57.5%;background:var(--blue)" title="MoE 352µs"></span>
+      <span style="width:15.5%;background:var(--yellow)" title="attn 95µs"></span>
+      <span style="width:10%;background:var(--cyan)" title="proj 61µs"></span>
+      <span style="width:6.2%;background:var(--purple)" title="shared 38µs"></span>
+      <span style="width:3.6%;background:var(--orange)" title="dsa 22µs"></span>
+      <span style="width:7.2%;background:var(--gray)" title="other 44µs"></span>
+    </div>
+
+    <h2>Call tree that HF Viewer never emits</h2>
+    <p>This is the same layer as a stack, including scheduler frames that are not “model architecture” but do steal GPU idle time.</p>
+    <details open>
+      <summary>SGLang Scheduler.run_batch / vLLM Worker.execute_model <span class="faint">engine, not in hfviewer</span></summary>
+      <details open>
+        <summary>ModelRunner.forward_decode (CUDA graph replay if captured)</summary>
+        <details open>
+          <summary>GlmMoeDsaForCausalLM.forward</summary>
+          <details><summary>VocabParallelEmbedding.forward</summary><p class="faint">Kernel: embedding gather. Bound: memory.</p></details>
+          <details open>
+            <summary>GlmMoeDsaDecoderLayer.forward ×78 (IndexShare on 3/4 sparse layers)</summary>
+            <details><summary>input_layernorm → fused_add_rmsnorm_kernel</summary><p class="faint">Often fused with the previous residual add so Perfetto shows one kernel for two Python lines.</p></details>
+            <details open>
+              <summary>GlmMoeDsaAttention.forward (MLA + DSA)</summary>
+              <p class="faint">q_a_proj → q_a_layernorm → q_b_proj; kv_a_proj_with_mqa → kv_a_layernorm → kv_b_proj; apply_rotary_pos_emb; DSABackend.indexer; sparse_mla_decode; o_proj.</p>
+            </details>
+            <details><summary>residual add (may be fused)</summary><p class="faint">Python still executes <code>hidden = residual + attn_out</code>. The CUDA launch may already have happened inside the next rmsnorm.</p></details>
+            <details><summary>post_attention_layernorm</summary></details>
+            <details open>
+              <summary>GlmMoeDsaMoE.forward</summary>
+              <p class="faint">gate → fused_topk → moe_align_block_size → shared_experts → grouped GEMM w1 (8 of 256) → silu_and_mul → grouped GEMM w2 → moe_combine.</p>
+            </details>
+            <details><summary>residual add</summary></details>
+          </details>
+          <details><summary>MTP head + ParallelLMHead.forward</summary><p class="faint">Speculative decoding is a sibling of the target model, not a block inside layer 78.</p></details>
+        </details>
+      </details>
+    </details>
+
+    <h2>The join you have to build — traces are not a model graph</h2>
+    <p>Perfetto is a timeline of events. A model view is a graph of operations. They only line up if every kernel launch carries a stable op id that also exists on the architecture IR.</p>
+    <div class="grid3">
+      <div class="card"><h3>1. Architecture IR</h3><div class="body">Parse <code>config.json</code> + <code>modeling_glm_moe_dsa.py</code> into nodes with stable ids: <code>layers.17.self_attn.indexer</code>. This is all hfviewer does.</div></div>
+      <div class="card"><h3>2. Engine IR</h3><div class="body">Walk vLLM/SGLang registries at init: AttentionBackend, Fp8MoeBackend, IndexShare skip, CUDA graph capture. This is where alternatives live.</div></div>
+      <div class="card"><h3>3. Profiler IR</h3><div class="body">NVTX around each <code>forward</code>, Kineto <code>record_function</code>, CUPTI kernel names. nsys = duration; ncu = AI / HBM% / SM%. Without NVTX you cannot map <code>fused_moe_kernel_16</code> back to layer 17.</div></div>
+    </div>
+    <h3>Correlation key (what must be on every event)</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Example</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td>op_id</td><td><code>layers.17.self_attn.sparse_mla</code></td><td>Which node on the model graph to color</td></tr>
+        <tr><td>module_fqn</td><td><code>model.layers.17.self_attn</code></td><td>Python module tree / fx node</td></tr>
+        <tr><td>function</td><td><code>DSABackend.forward</code></td><td>Engine frame hfviewer never has</td></tr>
+        <tr><td>kernel</td><td><code>flashinfer::mla_sparse_decode</code></td><td>Exact launch; Perfetto row name</td></tr>
+        <tr><td>backend</td><td>tilelang | FLASHINFER_MLA_SPARSE</td><td>Selected alternative</td></tr>
+        <tr><td>phase</td><td>decode / prefill / mtp_draft</td><td>Same op, different kernels</td></tr>
+        <tr><td>layer_idx + indexshare</td><td>17, reuse_from=16</td><td>Indexer present vs skipped</td></tr>
+        <tr><td>ai, bytes, flops, dur</td><td>6.4 FLOP/B, 95 µs</td><td>Heatmaps: latency, bound, AI</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tools today vs this view</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Shape</th><th>Misses</th></tr></thead>
+      <tbody>
+        <tr><td>HF Viewer / model-unfolder</td><td>Static architecture graph</td><td>No runtime, no vLLM/SGLang, no kernels, no heatmaps</td></tr>
+        <tr><td>Netron / torch.fx draw</td><td>Static ops graph</td><td>Serving fusions and paged KV are invisible</td></tr>
+        <tr><td>Perfetto / torch.profiler</td><td>Timeline</td><td>You cannot see the model; fusions hide Python ops</td></tr>
+        <tr><td>Nsight Systems</td><td>Timeline + CUDA</td><td>Kernel names, still not a model graph</td></tr>
+        <tr><td>Nsight Compute</td><td>Per-kernel roofline</td><td>One kernel at a time; no layer context</td></tr>
+        <tr><td>vLLM/SGLang gputrc2graph.py</td><td>Stacked bars by kernel category</td><td>Categories, not the GLM layer tree</td></tr>
+        <tr><td>This page</td><td>Architecture graph + attributes</td><td>Walkthrough timings until you join a live profile</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Practical way to get here on GLM-5.2</h2>
+    <table>
+      <thead><tr><th>Step</th><th>Do this</th><th>You get</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Serve with SGLang (<code>--dsa-prefill-backend tilelang --dsa-decode-backend tilelang</code>) or vLLM 0.23+ GLM-5.2 recipe</td><td>The real kernels, not Hugging Face eager</td></tr>
+        <tr><td>2</td><td>Wrap <code>nn.Module.forward</code> and backend <code>forward</code> with NVTX / <code>torch.profiler.record_function(op_id)</code></td><td>Every kernel nested under a stable op_id</td></tr>
+        <tr><td>3</td><td><code>nsys profile -t cuda,nvtx,osrt</code></td><td>Durations + kernel names</td></tr>
+        <tr><td>4</td><td>ncu on the top kernels (sparse MLA, grouped GEMM, indexer)</td><td>AI, HBM%, SM% → bound class</td></tr>
+        <tr><td>5</td><td>Dump engine registries at init (attention backend, MoE oracle, IndexShare map)</td><td>Alternative options per node</td></tr>
+        <tr><td>6</td><td>Join on op_id; render the module tree; color by the heatmap you picked</td><td>This graph, with live numbers</td></tr>
+      </tbody>
+    </table>
+    <div class="callout info"><b>Fusions are why a naive stack dump lies</b><code>residual + x</code> and RMSNorm often become one <code>fused_add_rmsnorm</code> kernel. <code>silu_and_mul</code> often dies as a CUTLASS epilogue. CUDA graphs collapse hundreds of launches into <code>cudaGraphLaunch</code>. The code-level view must keep the Python functions and show they fused.</div>
+    <p class="faint">Related: <a href="https://hfviewer.com/zai-org/GLM-5.2-FP8">HF Viewer GLM-5.2-FP8</a> · <a href="https://docs.sglang.io/cookbook/autoregressive/GLM/GLM-5.2">SGLang GLM-5.2 cookbook</a> · <a href="https://docs.vllm.ai/en/latest/design/attention_backends/">vLLM attention backends</a></p>
+  </div>
+  <script>
+    const MAX_LAT = 188;
+    const NODES = {
+      embed:{id:"embed",title:"VocabParallelEmbedding",file:"sglang/srt/models/glm_moe_dsa.py",latencyUs:18,ai:1.2,bound:"memory",bwPct:62,smPct:11,kernel:"at::native::index_select / embedding_fwd",stack:["GlmMoeDsaForCausalLM.forward","GlmMoeDsaModel.forward","VocabParallelEmbedding.forward"]},
+      layer:{id:"layer",title:"GlmMoeDsaDecoderLayer ×78",file:"modeling_glm_moe_dsa.py :: GlmMoeDsaDecoderLayer.forward",latencyUs:612,ai:48,bound:"mixed",bwPct:54,smPct:41,stack:["ModelRunner.forward_decode","GlmMoeDsaForCausalLM.forward","GlmMoeDsaModel.forward","for i in range(78): layers[i].forward"]},
+      in_norm:{id:"in_norm",title:"input_layernorm",file:"GlmMoeDsaDecoderLayer.forward",latencyUs:9,ai:0.6,bound:"memory",bwPct:71,smPct:8,kernel:"fused_add_rmsnorm_kernel",alts:[{label:"fused_add_rmsnorm (selected)",selected:true,when:"default SGLang / vLLM fused epilogue"},{label:"triton_rmsnorm",selected:false,when:"fallback; easier to compile, slower on H200"},{label:"torch.nn.RMSNorm",selected:false,when:"eager path; never what you want in serving"}],stack:["GlmMoeDsaDecoderLayer.forward","self.input_layernorm(hidden)","sglang.srt.layers.layernorm.RMSNorm.forward"]},
+      qa:{id:"qa",title:"q_a_proj",file:"GlmMoeDsaAttention.forward",latencyUs:14,ai:62,bound:"compute",bwPct:38,smPct:72,kernel:"cutlass::gemm::device::GemmUniversal<fp8>",alts:[{label:"CUTLASS FP8 GEMM (selected)",selected:true,when:"Hopper/Blackwell, FP8 weights"},{label:"DeepGEMM",selected:false,when:"often faster on H200 for K-aligned shapes"},{label:"cuBLASLt",selected:false,when:"PyTorch default; loses fused epilogue"}],stack:["GlmMoeDsaAttention.forward","self.q_a_proj(hidden)","ColumnParallelLinear.forward","quant_fp8_linear → cutlass gemm"]},
+      qaln:{id:"qaln",title:"q_a_layernorm",file:"GlmMoeDsaAttention.forward",latencyUs:4,ai:0.5,bound:"memory",bwPct:68,smPct:7,kernel:"rmsnorm_kernel",stack:["GlmMoeDsaAttention.forward","self.q_a_layernorm(q_lora)"]},
+      qb:{id:"qb",title:"q_b_proj",file:"GlmMoeDsaAttention.forward",latencyUs:16,ai:71,bound:"compute",bwPct:34,smPct:78,kernel:"cutlass::gemm::device::GemmUniversal<fp8>",stack:["GlmMoeDsaAttention.forward","self.q_b_proj(q_lora_norm)"]},
+      kva:{id:"kva",title:"kv_a_proj_with_mqa",file:"GlmMoeDsaAttention.forward",latencyUs:11,ai:55,bound:"mixed",bwPct:49,smPct:58,kernel:"cutlass::gemm::device::GemmUniversal<fp8>",stack:["GlmMoeDsaAttention.forward","self.kv_a_proj_with_mqa(hidden)","latent KV compression (MLA)"]},
+      kvaln:{id:"kvaln",title:"kv_a_layernorm",file:"GlmMoeDsaAttention.forward",latencyUs:3,ai:0.5,bound:"memory",bwPct:64,smPct:6,kernel:"rmsnorm_kernel",stack:["GlmMoeDsaAttention.forward","self.kv_a_layernorm(kv_lora)"]},
+      kvb:{id:"kvb",title:"kv_b_proj",file:"GlmMoeDsaAttention.forward",latencyUs:7,ai:44,bound:"mixed",bwPct:51,smPct:49,kernel:"cutlass::gemm::device::GemmUniversal<fp8>",stack:["GlmMoeDsaAttention.forward","self.kv_b_proj(kv_lora_norm)"]},
+      rope:{id:"rope",title:"apply_rotary_pos_emb",file:"GlmMoeDsaAttention.forward",latencyUs:5,ai:2.1,bound:"memory",bwPct:59,smPct:14,kernel:"fused_rope_kernel",alts:[{label:"fused RoPE (selected)",selected:true,when:"default in SGLang MLA path"},{label:"PyTorch complex mul",selected:false,when:"eager / debug only"}],stack:["GlmMoeDsaAttention.forward","apply_rotary_pos_emb(q, k, cos, sin)"]},
+      indexer:{id:"indexer",title:"DSA indexer top-k",file:"sglang/srt/layers/attention/nsa_backend.py",latencyUs:22,ai:8,bound:"memory",bwPct:74,smPct:22,kernel:"tilelang_dsa_indexer_topk",alts:[{label:"tilelang (--dsa-*-backend tilelang)",selected:true,when:"GLM-5.2 cookbook default on H200/B200 and ROCm"},{label:"FlashInfer sparse indexer",selected:false,when:"NVIDIA SM90+ when FlashInfer sparse MLA is selected"},{label:"Triton top-k JIT",selected:false,when:"CUDA fallback; will not build on gfx950"},{label:"IndexShare skip (no launch)",selected:false,when:"layers 1,2,3 of every 4 reuse previous top-k"}],stack:["GlmMoeDsaAttention.forward","DSABackend.forward(q, kv, page_table)","indexer_kernel → topk_indices"]},
+      sparse:{id:"sparse",title:"sparse MLA decode",file:"sglang/srt/layers/attention/nsa_backend.py",latencyUs:95,ai:6.4,bound:"memory",bwPct:78,smPct:19,kernel:"flashinfer::mla_sparse_decode / tilelang_sparse_mla",alts:[{label:"FLASHINFER_MLA_SPARSE",selected:true,when:"vLLM default for FP8 KV sparse MLA on NVIDIA"},{label:"tilelang sparse MLA (SGLang)",selected:false,when:"--dsa-decode-backend tilelang"},{label:"FLASHMLA_SPARSE",selected:false,when:"vLLM fallback when FlashInfer sparse is unavailable"},{label:"CUTLASS_MLA (dense)",selected:false,when:"dense MLA only — not the DSA path"},{label:"TRITON_MLA",selected:false,when:"portable fallback; usually the slowest decode path"},{label:"ROCM_AITER_MLA_SPARSE",selected:false,when:"AMD MI3xx with AITER"}],stack:["GlmMoeDsaAttention.forward","DSABackend.forward","sparse_mla_decode(q, paged_kv, topk_idx)","kernel launch on current stream"]},
+      oproj:{id:"oproj",title:"o_proj",file:"GlmMoeDsaAttention.forward",latencyUs:13,ai:58,bound:"compute",bwPct:36,smPct:69,kernel:"cutlass::gemm::device::GemmUniversal<fp8>",stack:["GlmMoeDsaAttention.forward","self.o_proj(attn_out)"]},
+      res1:{id:"res1",title:"residual add",file:"GlmMoeDsaDecoderLayer.forward",latencyUs:4,ai:0.3,bound:"memory",bwPct:55,smPct:5,kernel:"vectorized_elementwise_kernel (often fused into rmsnorm)",stack:["hidden = residual + attn_out"]},
+      post_norm:{id:"post_norm",title:"post_attention_layernorm",file:"GlmMoeDsaDecoderLayer.forward",latencyUs:8,ai:0.6,bound:"memory",bwPct:70,smPct:8,kernel:"fused_add_rmsnorm_kernel",stack:["GlmMoeDsaDecoderLayer.forward","self.post_attention_layernorm(hidden)"]},
+      gate:{id:"gate",title:"MoE router / gate",file:"sglang/srt/layers/moe/fused_moe.py",latencyUs:12,ai:18,bound:"mixed",bwPct:44,smPct:31,kernel:"fused_moe_gate_softmax_topk",alts:[{label:"fused gate+softmax+topk (selected)",selected:true,when:"always-on for serving"},{label:"torch.softmax + topk",selected:false,when:"eager debug"}],stack:["GlmMoeDsaMoE.forward","self.gate(hidden)","fused_topk(scores, k=8)"]},
+      shared:{id:"shared",title:"shared expert (always-on)",file:"GlmMoeDsaMoE.forward",latencyUs:38,ai:92,bound:"compute",bwPct:41,smPct:81,kernel:"cutlass / DeepGEMM SwiGLU fused",stack:["GlmMoeDsaMoE.forward","self.shared_experts(hidden)","w1 GEMM → silu_and_mul → w2 GEMM"]},
+      align:{id:"align",title:"moe_align_block_size",file:"fused_moe.py",latencyUs:6,ai:0.4,bound:"launch",bwPct:12,smPct:4,kernel:"moe_align_block_size_kernel",stack:["fused_moe.forward","permute tokens by expert","moe_align_block_size"]},
+      w1:{id:"w1",title:"grouped GEMM w1 (8/256)",file:"fused_moe experts",latencyUs:188,ai:140,bound:"compute",bwPct:47,smPct:86,kernel:"deep_gemm::fp8_grouped_gemm / flashinfer_cutlass_moe",alts:[{label:"DeepGEMM grouped (selected)",selected:true,when:"FP8 MoE on Hopper/Blackwell, good occupancy"},{label:"FLASHINFER_CUTLASS",selected:false,when:"vLLM Fp8MoeBackend; strong on SM100"},{label:"FLASHINFER_TRTLLM",selected:false,when:"monolithic TRT-LLM experts on Blackwell"},{label:"TRITON / BATCHED_TRITON",selected:false,when:"portable; usually loses to DeepGEMM on H200"},{label:"MARLIN",selected:false,when:"weight-only INT4/INT8 MoE, not this FP8 checkpoint"},{label:"AITER",selected:false,when:"ROCm --moe-backend aiter"}],stack:["GlmMoeDsaMoE.forward","FusedMoE.forward","TritonOrDeepGemmExperts","grouped_gemm(w1)  # 8 active of 256"]},
+      act:{id:"act",title:"silu_and_mul",file:"fused_moe epilogue",latencyUs:11,ai:1.1,bound:"memory",bwPct:66,smPct:12,kernel:"silu_and_mul_kernel (often fused into GEMM epilogue)",alts:[{label:"GEMM epilogue fused (selected)",selected:true,when:"CUTLASS/DeepGEMM epilogue"},{label:"standalone silu_and_mul",selected:false,when:"Triton MoE that does not fuse activation"}],stack:["FusedMoE.forward","silu_and_mul(w1_out)"]},
+      w2:{id:"w2",title:"grouped GEMM w2 (8/256)",file:"fused_moe experts",latencyUs:164,ai:128,bound:"compute",bwPct:45,smPct:84,kernel:"deep_gemm::fp8_grouped_gemm",stack:["FusedMoE.forward","grouped_gemm(w2)"]},
+      combine:{id:"combine",title:"moe_combine + shared add",file:"GlmMoeDsaMoE.forward",latencyUs:9,ai:1.4,bound:"memory",bwPct:61,smPct:11,kernel:"moe_sum_kernel",stack:["unpermute expert outputs","weighted sum by router scores","add shared expert"]},
+      mtp:{id:"mtp",title:"MTP speculative head",file:"GlmMoeDsaForCausalLM.forward",latencyUs:86,ai:40,bound:"mixed",bwPct:52,smPct:38,kernel:"same kernels as a shallow decoder layer",stack:["speculative_algorithm=EAGLE/MTP","mtp_layer.forward(hidden)","draft token logits"]},
+      lm:{id:"lm",title:"lm_head",file:"GlmMoeDsaForCausalLM.forward",latencyUs:24,ai:36,bound:"mixed",bwPct:48,smPct:44,kernel:"cutlass gemm vocab projection",stack:["ParallelLMHead.forward","hidden @ vocab_weight.T"]}
+    };
+    const GRAPHS = {
+      architecture:{nodes:["embed","layer","mtp","lm"],edges:[["embed","layer"],["layer","mtp"],["layer","lm"]]},
+      modules:{nodes:["in_norm","sparse","res1","post_norm","w1","combine"],edges:[["in_norm","sparse"],["sparse","res1"],["res1","post_norm"],["post_norm","w1"],["w1","combine"]]},
+      functions:{nodes:["in_norm","qa","qb","kva","kvb","rope","indexer","sparse","oproj","res1","post_norm","gate","shared","w1","combine"],edges:[["in_norm","qa"],["in_norm","kva"],["qa","qb"],["kva","kvb"],["qb","rope"],["kvb","rope"],["rope","indexer"],["indexer","sparse"],["sparse","oproj"],["oproj","res1"],["res1","post_norm"],["post_norm","gate"],["post_norm","shared"],["gate","w1"],["w1","combine"],["shared","combine"]]},
+      kernels:{nodes:["in_norm","qa","qaln","qb","kva","kvaln","kvb","rope","indexer","sparse","oproj","res1","post_norm","gate","align","shared","w1","act","w2","combine"],edges:[["in_norm","qa"],["in_norm","kva"],["qa","qaln"],["qaln","qb"],["kva","kvaln"],["kvaln","kvb"],["qb","rope"],["kvb","rope"],["rope","indexer"],["indexer","sparse"],["sparse","oproj"],["oproj","res1"],["res1","post_norm"],["post_norm","gate"],["post_norm","shared"],["gate","align"],["align","w1"],["w1","act"],["act","w2"],["w2","combine"],["shared","combine"]]}
+    };
+    const COLORS = {memory:"var(--yellow)",compute:"var(--blue)",mixed:"var(--orange)",launch:"var(--gray)"};
+    const state = {depth:"kernels", heat:"latency", engine:"sglang", selected:"sparse"};
+
+    function layout(g) {
+      const NW=168, NH=44, RG=36, NG=16, P=12;
+      const parents = {}, kids = {};
+      g.nodes.forEach(id => { parents[id]=[]; kids[id]=[]; });
+      g.edges.forEach(([a,b]) => { parents[b].push(a); kids[a].push(b); });
+      const rank = {};
+      function rnk(id) {
+        if (rank[id] != null) return rank[id];
+        rank[id] = parents[id].length ? Math.max(...parents[id].map(rnk))+1 : 0;
+        return rank[id];
+      }
+      g.nodes.forEach(rnk);
+      const by = {};
+      g.nodes.forEach(id => { (by[rank[id]] ||= []).push(id); });
+      const maxR = Math.max(...Object.keys(by).map(Number));
+      let maxW = 0;
+      for (let r=0;r<=maxR;r++) {
+        const row = by[r]||[];
+        maxW = Math.max(maxW, row.length*NW + Math.max(0,row.length-1)*NG);
+      }
+      maxW += P*2;
+      const pos = {};
+      for (let r=0;r<=maxR;r++) {
+        const row = by[r]||[];
+        const rowW = row.length*NW + Math.max(0,row.length-1)*NG;
+        let x = (maxW-rowW)/2;
+        const y = P + r*(NH+RG);
+        row.forEach(id => { pos[id]={x,y,w:NW,h:NH}; x += NW+NG; });
+      }
+      return {pos, width:maxW, height:P*2+(maxR+1)*NH+maxR*RG, edges:g.edges};
+    }
+    function heatFill(n) {
+      if (state.heat==="none") return "var(--fill)";
+      if (state.heat==="bound") return COLORS[n.bound];
+      if (state.heat==="ai") return n.ai<8?"var(--yellow)":n.ai<80?"var(--orange)":"var(--blue)";
+      const t=n.latencyUs/MAX_LAT;
+      if (t>0.55) return "var(--red)";
+      if (t>0.25) return "var(--orange)";
+      if (t>0.1) return "var(--yellow)";
+      return "var(--fill)";
+    }
+    function heatText(n) {
+      const hot = state.heat==="latency" ? n.latencyUs/MAX_LAT>0.55 : state.heat==="bound" ? n.bound==="compute" : state.heat==="ai" ? n.ai>=80 : false;
+      return hot ? "#141414" : "var(--text)";
+    }
+    function boundLabel(b){ return b==="memory"?"memory-bound":b==="compute"?"compute-bound":b==="launch"?"launch-bound":"mixed / ridge"; }
+    function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+    function renderGraph() {
+      const g = GRAPHS[state.depth];
+      const L = layout(g);
+      const lines = L.edges.map(([a,b]) => {
+        const A=L.pos[a], B=L.pos[b];
+        return `<line x1="${A.x+A.w/2}" y1="${A.y+A.h}" x2="${B.x+B.w/2}" y2="${B.y}" stroke="#555" stroke-width="1"/>`;
+      }).join("");
+      const nodes = g.nodes.map(id => {
+        const n=NODES[id], p=L.pos[id];
+        const sub = n.kernel ? n.kernel.split(" ")[0] : n.file.split("::").pop();
+        return `<button class="node${state.selected===id?" sel":""}" data-id="${id}" style="left:${p.x}px;top:${p.y}px;background:${heatFill(n)};color:${heatText(n)}"><div class="t">${esc(n.title)}</div><div class="k">${esc(sub)}</div></button>`;
+      }).join("");
+      document.getElementById("graph").innerHTML = `<svg width="${L.width}" height="${L.height}" style="position:absolute;inset:0">${lines}</svg>${nodes}`;
+      document.getElementById("graph").style.height = L.height+"px";
+      document.querySelectorAll(".node").forEach(btn => btn.onclick = () => { state.selected = btn.dataset.id; render(); });
+    }
+    function renderInspector() {
+      const n = NODES[state.selected] || NODES.sparse;
+      const alts = n.alts && n.alts.length
+        ? `<h3>Alternative kernels / backends</h3><table><thead><tr><th>Backend</th><th>Status</th><th>When you would pick it</th></tr></thead><tbody>${n.alts.map(a=>`<tr><td>${esc(a.label)}</td><td>${a.selected?"running now":"available"}</td><td>${esc(a.when)}</td></tr>`).join("")}</tbody></table><p class="faint">Source of alternatives: vLLM AttentionBackend registry + Fp8MoeBackend oracle, SGLang flags — not the trace.</p>`
+        : `<p class="muted">No registered alternatives for this op — usually a fused epilogue or a tiny elementwise that rides along with the previous GEMM.</p>`;
+      document.getElementById("inspector").innerHTML = `
+        <p><b>${esc(n.title)}</b> · ${boundLabel(n.bound)}</p>
+        <p class="faint">${esc(n.file)}</p>
+        <div class="stats" style="grid-template-columns:1fr 1fr">
+          <div class="stat"><div class="v">${n.latencyUs} µs</div><div class="l">GPU time this decode step</div></div>
+          <div class="stat"><div class="v">${n.ai.toFixed(1)}</div><div class="l">FLOP / byte (AI)</div></div>
+          <div class="stat"><div class="v">${n.bwPct}%</div><div class="l">HBM bandwidth util</div></div>
+          <div class="stat"><div class="v">${n.smPct}%</div><div class="l">SM compute util</div></div>
+        </div>
+        ${n.kernel?`<div class="callout info"><b>Kernel that actually launched</b>${state.engine==="sglang"?"SGLang":"vLLM"} dispatched <code>${esc(n.kernel)}</code>. This is the name you would see in nsys / Perfetto, mapped onto the model node.</div>`:""}
+        <h3>Call stack (code-level, nothing dropped)</h3>
+        <table><thead><tr><th>Frame</th><th>Symbol</th></tr></thead><tbody>${n.stack.map((s,i)=>`<tr><td>${i}</td><td><code>${esc(s)}</code></td></tr>`).join("")}</tbody></table>
+        ${alts}
+        <div class="bar"><i style="width:${Math.min(100,n.latencyUs/MAX_LAT*100)}%;background:var(--accent)"></i></div>
+        <p class="faint">Bar length is GPU time vs the hottest kernel in this layer (grouped GEMM w1 = ${MAX_LAT} µs).</p>`;
+      document.getElementById("engLabel").textContent = state.engine;
+      const node = n;
+      document.getElementById("stats").innerHTML = `
+        <div class="stat"><div class="v">78</div><div class="l">Decoder layers (IndexShare every 4)</div></div>
+        <div class="stat"><div class="v">256 / 8+1</div><div class="l">Routed experts / active + shared</div></div>
+        <div class="stat"><div class="v">6</div><div class="l">Correlation layers to join</div></div>
+        <div class="stat"><div class="v">${node.latencyUs} µs</div><div class="l">Selected: ${esc(node.title)}</div></div>`;
+    }
+    function renderBars() {
+      const rows = [["grouped GEMM w1",188],["grouped GEMM w2",164],["sparse MLA",95],["shared expert",38],["DSA indexer",22],["Q/KV/O projections",61],["router + align",18],["norms / RoPE / residual",29]];
+      document.getElementById("bars").innerHTML = rows.map(([n,v]) =>
+        `<div class="bar-row"><span>${n}</span><div class="bar"><i style="width:${v/188*100}%"></i></div><span>${v} µs</span></div>`
+      ).join("");
+    }
+    function render(){ renderGraph(); renderInspector(); }
+    document.getElementById("depth").onchange = e => { state.depth=e.target.value; render(); };
+    document.getElementById("heat").onchange = e => { state.heat=e.target.value; document.querySelectorAll(".pill").forEach(p=>p.classList.toggle("on", p.dataset.heat===state.heat)); render(); };
+    document.getElementById("engine").onchange = e => { state.engine=e.target.value; render(); };
+    document.querySelectorAll(".pill").forEach(p => p.onclick = () => { state.heat=p.dataset.heat; document.getElementById("heat").value=state.heat; document.querySelectorAll(".pill").forEach(x=>x.classList.toggle("on", x===p)); render(); });
+    renderBars();
+    render();
+  </script>
+</body>
+</html>
